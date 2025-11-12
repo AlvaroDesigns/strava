@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 export interface StatsData {
   totalActivities: number;
+  totalActivitiesAllTypes?: number;
+  availableActivityTypes?: string[];
   kilometersByUser: Array<{ name: string; kilometers: number }>;
   kilometersByUserAndDate?: {
     data: Array<{ date: string; [key: string]: string | number }>;
@@ -32,6 +34,7 @@ interface UseActivitiesStatsParams {
   period?: "week" | "month";
   userId?: string | null;
   activityType?: "Ride" | "Run" | "Swim";
+  currentUserId?: string;
   enabled?: boolean;
 }
 
@@ -42,10 +45,11 @@ export function useActivitiesStats({
   period = "month",
   userId = null,
   activityType = "Ride",
+  currentUserId,
   enabled = true,
 }: UseActivitiesStatsParams = {}) {
   return useQuery<StatsData>({
-    queryKey: ["activities-stats", period, userId, activityType],
+    queryKey: ["activities-stats", period, userId, activityType, currentUserId],
     queryFn: async () => {
       const params = new URLSearchParams({
         period,

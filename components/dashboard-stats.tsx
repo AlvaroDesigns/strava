@@ -130,7 +130,7 @@ export function DashboardStats({
                         <p className="text-sm text-muted-foreground">
                           Tipos disponibles:{" "}
                           {stats.availableActivityTypes
-                            .map((type) => {
+                            .map((type: string) => {
                               const typeMap: Record<string, string> = {
                                 Ride: "Bicicleta",
                                 Run: "Correr",
