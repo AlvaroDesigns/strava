@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String              @id @default(cuid())
+  email             String              @unique
+  password          String
+  name              String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  stravaConfig      StravaConfig?
+  stravaAccount     StravaAccount?
+  activities        Activity[]
+  passwordResets    PasswordResetToken[]
+}
+
+model StravaConfig {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId      String
+  clientSecret  String   // En producción, debería estar encriptado
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model StravaAccount {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stravaId          String     @unique
+  accessToken       String
+  refreshToken      String
+  expiresAt         DateTime
+  firstName         String?
+  lastName          String?
+  profile           String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  activities        Activity[]
+}
+
+model Activity {
+  id                    String         @id @default(cuid())
+  stravaActivityId      BigInt         @unique // ID de la actividad en Strava (puede ser muy grande)
+  userId                String
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stravaAccountId       String
+  stravaAccount         StravaAccount  @relation(fields: [stravaAccountId], references: [id], onDelete: Cascade)
+  name                  String
+  type                  String?
+  distance              Float          // en metros
+  movingTime            Int            // en segundos
+  elapsedTime           Int            // en segundos
+  totalElevationGain    Float?         // en metros
+  averageSpeed          Float?         // en m/s
+  maxSpeed              Float?         // en m/s
+  averageWatts          Float?
+  maxWatts              Float?
+  startDate             DateTime       // Fecha de inicio de la actividad
+  startDateLocal        DateTime       // Fecha local de inicio
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([stravaAccountId])
+  @@index([startDate])
+  @@index([startDateLocal])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  used      Boolean  @default(false)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
