@@ -9,6 +9,8 @@ import { getTestStravaCredentials } from "@/lib/strava-auth";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 interface Activity {
   id: number;
   name: string;

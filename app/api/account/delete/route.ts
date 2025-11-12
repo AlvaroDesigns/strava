@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Ruta API para eliminar la cuenta del usuario
  * Elimina todos los datos relacionados:

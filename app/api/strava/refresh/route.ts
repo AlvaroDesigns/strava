@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTestStravaCredentials } from "@/lib/strava-auth";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Intenta refrescar el token de Strava si existe una cuenta conectada
  * Esto evita redirecciones innecesarias a la página de autorización

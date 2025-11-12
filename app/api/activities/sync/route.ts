@@ -1,22 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { cleanOldActivities, saveActivities } from "@/lib/activities";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { saveActivities, cleanOldActivities } from "@/lib/activities";
 import { getTestStravaCredentials } from "@/lib/strava-auth";
+import { getServerSession } from "next-auth";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Ruta API para sincronizar actividades de Strava
  * Esta ruta obtiene las actividades de los últimos 2 meses desde la API de Strava
  * y las guarda en la base de datos, luego limpia las actividades antiguas.
- * 
+ *
  * Se puede llamar periódicamente (por ejemplo, con un cron job) para mantener
  * los datos actualizados.
- * 
+ *
  * Autenticación:
  * - Opción 1: Sesión de usuario autenticado (NextAuth)
  * - Opción 2: Token secreto en header Authorization: Bearer YOUR_SECRET_TOKEN
- * 
+ *
  * Para usar el token secreto, configura SYNC_SECRET_TOKEN en tu archivo .env
  */
 export async function POST(request: NextRequest) {
@@ -41,9 +43,10 @@ export async function POST(request: NextRequest) {
 
     if (!isAuthenticated) {
       return NextResponse.json(
-        { 
+        {
           error: "No autorizado",
-          message: "Se requiere autenticación mediante sesión o token secreto (Authorization: Bearer YOUR_SECRET_TOKEN)"
+          message:
+            "Se requiere autenticación mediante sesión o token secreto (Authorization: Bearer YOUR_SECRET_TOKEN)",
         },
         { status: 401 }
       );
@@ -82,24 +85,28 @@ export async function POST(request: NextRequest) {
         // Usar credenciales de prueba si no hay configuración
         const testCredentials = getTestStravaCredentials();
         const clientId = stravaConfig?.clientId || testCredentials.clientId;
-        const clientSecret = stravaConfig?.clientSecret || testCredentials.clientSecret;
+        const clientSecret =
+          stravaConfig?.clientSecret || testCredentials.clientSecret;
 
         // Verificar y refrescar token si es necesario
         let accessToken = stravaAccount.accessToken;
         if (new Date() >= stravaAccount.expiresAt) {
           try {
-            const refreshResponse = await fetch("https://www.strava.com/oauth/token", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                client_id: clientId,
-                client_secret: clientSecret,
-                refresh_token: stravaAccount.refreshToken,
-                grant_type: "refresh_token",
-              }),
-            });
+            const refreshResponse = await fetch(
+              "https://www.strava.com/oauth/token",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  refresh_token: stravaAccount.refreshToken,
+                  grant_type: "refresh_token",
+                }),
+              }
+            );
 
             if (refreshResponse.ok) {
               const refreshData = await refreshResponse.json();
@@ -118,7 +125,10 @@ export async function POST(request: NextRequest) {
               });
             }
           } catch (error) {
-            console.error(`Error al refrescar token para usuario ${stravaAccount.userId}:`, error);
+            console.error(
+              `Error al refrescar token para usuario ${stravaAccount.userId}:`,
+              error
+            );
             continue;
           }
         }
@@ -137,7 +147,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (!response.ok) {
-          console.error(`Error al obtener actividades para usuario ${stravaAccount.userId}`);
+          console.error(
+            `Error al obtener actividades para usuario ${stravaAccount.userId}`
+          );
           continue;
         }
 
@@ -168,16 +180,27 @@ export async function POST(request: NextRequest) {
 
         // Guardar actividades en la base de datos
         if (detailedActivities.length > 0) {
-          await saveActivities(detailedActivities, stravaAccount.userId, stravaAccount.id);
+          await saveActivities(
+            detailedActivities,
+            stravaAccount.userId,
+            stravaAccount.id
+          );
           totalSynced += detailedActivities.length;
           results.push({
             userId: stravaAccount.userId,
-            userName: stravaAccount.firstName || stravaAccount.user?.name || stravaAccount.user?.email || "Usuario",
+            userName:
+              stravaAccount.firstName ||
+              stravaAccount.user?.name ||
+              stravaAccount.user?.email ||
+              "Usuario",
             activitiesCount: detailedActivities.length,
           });
         }
       } catch (error) {
-        console.error(`Error al sincronizar actividades para usuario ${stravaAccount.userId}:`, error);
+        console.error(
+          `Error al sincronizar actividades para usuario ${stravaAccount.userId}:`,
+          error
+        );
         results.push({
           userId: stravaAccount.userId,
           error: "Error al sincronizar",
@@ -210,4 +233,3 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   return POST(request);
 }
-
