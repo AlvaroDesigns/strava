@@ -9,12 +9,20 @@ export interface StatsData {
     data: Array<{ date: string; [key: string]: string | number }>;
     users: Array<{ id: string; name: string; key: string }>;
   };
-  averageSpeedByUser: Array<{ userId: string; name: string; averageSpeed: number }>;
+  averageSpeedByUser: Array<{
+    userId: string;
+    name: string;
+    averageSpeed: number;
+  }>;
   averageSpeedByUserAndDate?: {
     data: Array<{ date: string; [key: string]: string | number }>;
     users: Array<{ id: string; name: string; key: string }>;
   };
-  averageElevationByUser: Array<{ userId: string; name: string; averageElevation: number }>;
+  averageElevationByUser: Array<{
+    userId: string;
+    name: string;
+    averageElevation: number;
+  }>;
   averageElevationByUserAndDate?: {
     data: Array<{ date: string; [key: string]: string | number }>;
     users: Array<{ id: string; name: string; key: string }>;
@@ -30,7 +38,7 @@ export interface StatsData {
   maxElevation: number;
 }
 
-interface UseActivitiesStatsParams {
+export interface UseActivitiesStatsParams {
   period?: "week" | "month";
   userId?: string | null;
   activityType?: "Ride" | "Run" | "Swim";
@@ -58,7 +66,7 @@ export function useActivitiesStats({
       });
 
       const response = await fetch(`/api/activities/stats?${params}`);
-      
+
       if (!response.ok) {
         throw new Error("Error al obtener estadísticas");
       }
@@ -73,4 +81,3 @@ export function useActivitiesStats({
     enabled,
   });
 }
-
