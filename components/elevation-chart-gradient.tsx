@@ -113,7 +113,7 @@ export function ElevationChartGradient({ data, users }: ElevationChartGradientPr
                       year: "numeric",
                     });
                   }}
-                  formatter={(value: number) => `${value.toFixed(0)} m`}
+                  formatter={(value) => `${Number(value).toFixed(0)} m`}
                 />
               }
             />

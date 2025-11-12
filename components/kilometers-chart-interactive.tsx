@@ -178,7 +178,7 @@ export function KilometersChartInteractive({
                     });
                   }}
                   indicator="dot"
-                  formatter={(value: number) => `${value.toFixed(2)} km`}
+                  formatter={(value) => `${Number(value).toFixed(2)} km`}
                 />
               }
             />

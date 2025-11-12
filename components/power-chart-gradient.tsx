@@ -96,7 +96,7 @@ export function PowerChartGradient({ data }: PowerChartGradientProps) {
                       year: "numeric",
                     });
                   }}
-                  formatter={(value: number) => `${value.toFixed(0)} W`}
+                  formatter={(value) => `${Number(value).toFixed(0)} W`}
                 />
               }
             />
