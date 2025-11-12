@@ -347,13 +347,13 @@ function getPayloadConfigFromPayload(
   const configKey =
     key in config
       ? key
-      : payloadPayload && "fill" in payloadPayload
+      : payloadPayload && "fill" in payloadPayload && typeof payloadPayload.fill === "string"
         ? payloadPayload.fill
         : "color" in payload && typeof payload.color === "string"
           ? payload.color
           : key
 
-  return configKey in config ? config[configKey] : undefined
+  return typeof configKey === "string" && configKey in config ? config[configKey] : undefined
 }
 
 export {
