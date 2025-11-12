@@ -113,7 +113,7 @@ export function SpeedChartGradient({ data, users }: SpeedChartGradientProps) {
                       year: "numeric",
                     });
                   }}
-                  formatter={(value: number) => `${value.toFixed(2)} km/h`}
+                  formatter={(value) => `${Number(value).toFixed(2)} km/h`}
                 />
               }
             />
