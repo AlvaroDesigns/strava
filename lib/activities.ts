@@ -4,28 +4,28 @@ import { prisma, reconnectPrisma } from "./prisma";
  * Guarda o actualiza una actividad de Strava en la base de datos
  */
 export async function saveActivity(activity: any, userId: string, stravaAccountId: string) {
-  try {
-    // Convertir el ID de Strava a BigInt para manejar números grandes
-    const stravaActivityId = BigInt(activity.id);
-    
-    const activityData = {
-      stravaActivityId,
-      userId,
-      stravaAccountId,
-      name: activity.name || "Actividad sin nombre",
-      type: activity.type || null,
-      distance: activity.distance || 0,
-      movingTime: activity.moving_time || 0,
-      elapsedTime: activity.elapsed_time || 0,
-      totalElevationGain: activity.total_elevation_gain || null,
-      averageSpeed: activity.average_speed || null,
-      maxSpeed: activity.max_speed || null,
-      averageWatts: activity.average_watts || null,
-      maxWatts: activity.max_watts || null,
-      startDate: new Date(activity.start_date),
-      startDateLocal: new Date(activity.start_date_local),
-    };
+  // Convertir el ID de Strava a BigInt para manejar números grandes
+  const stravaActivityId = BigInt(activity.id);
+  
+  const activityData = {
+    stravaActivityId,
+    userId,
+    stravaAccountId,
+    name: activity.name || "Actividad sin nombre",
+    type: activity.type || null,
+    distance: activity.distance || 0,
+    movingTime: activity.moving_time || 0,
+    elapsedTime: activity.elapsed_time || 0,
+    totalElevationGain: activity.total_elevation_gain || null,
+    averageSpeed: activity.average_speed || null,
+    maxSpeed: activity.max_speed || null,
+    averageWatts: activity.average_watts || null,
+    maxWatts: activity.max_watts || null,
+    startDate: new Date(activity.start_date),
+    startDateLocal: new Date(activity.start_date_local),
+  };
 
+  try {
     // Usar upsert para crear o actualizar la actividad
     await prisma.activity.upsert({
       where: {
