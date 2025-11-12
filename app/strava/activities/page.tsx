@@ -183,7 +183,7 @@ export default async function ActivitiesPage() {
                   No hay actividades disponibles en este momento.
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Haz clic en "Sincronizar Actividades" para obtener tus actividades desde Strava.
+                  Haz clic en &quot;Sincronizar Actividades&quot; para obtener tus actividades desde Strava.
                 </p>
               </div>
             ) : (
