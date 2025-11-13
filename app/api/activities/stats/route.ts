@@ -5,7 +5,6 @@ import {
 } from "@/lib/activities";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTestStravaCredentials } from "@/lib/strava-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -40,11 +39,14 @@ async function getActivitiesForUser(
     // Verificar si el token ha expirado
     if (new Date() >= stravaAccount.expiresAt) {
       try {
-        // Usar credenciales de prueba si no hay configuración
-        const testCredentials = getTestStravaCredentials();
-        const clientId = stravaConfig?.clientId || testCredentials.clientId;
-        const clientSecret =
-          stravaConfig?.clientSecret || testCredentials.clientSecret;
+        // Las credenciales deben estar en la base de datos
+        if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+          console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
+          continue;
+        }
+
+        const clientId = stravaConfig.clientId;
+        const clientSecret = stravaConfig.clientSecret;
 
         const refreshResponse = await fetch(
           "https://www.strava.com/oauth/token",
@@ -275,17 +277,16 @@ export async function GET(request: NextRequest) {
             },
           });
 
-          // Usar credenciales de prueba si no hay configuración
-          const testCredentials = getTestStravaCredentials();
-          const configToUse = stravaConfig || {
-            clientId: testCredentials.clientId,
-            clientSecret: testCredentials.clientSecret,
-          };
+          // Las credenciales deben estar en la base de datos
+          if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+            console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
+            continue;
+          }
 
           try {
             const syncedActivities = await getActivitiesForUser(
               { ...stravaAccount, user: stravaAccount.user },
-              configToUse,
+              stravaConfig,
               startDate,
               now
             );
@@ -325,17 +326,16 @@ export async function GET(request: NextRequest) {
               },
             });
 
-            // Usar credenciales de prueba si no hay configuración
-            const testCredentials = getTestStravaCredentials();
-            const configToUse = stravaConfig || {
-              clientId: testCredentials.clientId,
-              clientSecret: testCredentials.clientSecret,
-            };
+            // Las credenciales deben estar en la base de datos
+            if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+              console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
+              return;
+            }
 
             try {
               await getActivitiesForUser(
                 { ...stravaAccount, user: stravaAccount.user },
-                configToUse,
+                stravaConfig,
                 startDate,
                 now
               );

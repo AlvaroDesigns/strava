@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTestStravaCredentials } from "@/lib/strava-auth";
 
 export const dynamic = 'force-dynamic';
 
@@ -41,10 +40,16 @@ export async function POST(request: Request) {
       },
     });
 
-    // Usar credenciales de prueba si no hay configuración en la BD
-    const testCredentials = getTestStravaCredentials();
-    const clientId = stravaConfig?.clientId || testCredentials.clientId;
-    const clientSecret = stravaConfig?.clientSecret || testCredentials.clientSecret;
+    // Las credenciales deben estar en la base de datos
+    if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+      return NextResponse.json(
+        { error: "Credenciales de Strava no configuradas en tu perfil" },
+        { status: 400 }
+      );
+    }
+
+    const clientId = stravaConfig.clientId;
+    const clientSecret = stravaConfig.clientSecret;
 
     // Intentar refrescar el token
     try {

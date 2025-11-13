@@ -17,7 +17,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getTestStravaCredentials } from "@/lib/strava-auth";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -141,10 +140,14 @@ async function getRecentActivities(stravaAccount: any) {
       },
     });
 
-    // Usar credenciales de prueba si no hay configuración
-    const testCredentials = getTestStravaCredentials();
-    const clientId = stravaConfig?.clientId || testCredentials.clientId;
-    const clientSecret = stravaConfig?.clientSecret || testCredentials.clientSecret;
+    // Las credenciales deben estar en la base de datos
+    if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+      console.error("Credenciales de Strava no configuradas para el usuario");
+      return null;
+    }
+
+    const clientId = stravaConfig.clientId;
+    const clientSecret = stravaConfig.clientSecret;
 
     // Verificar si el token ha expirado
     let accessToken = stravaAccount.accessToken;

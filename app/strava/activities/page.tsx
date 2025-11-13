@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ActivitiesList } from "@/components/activities-list";
 import { SyncActivitiesButton } from "@/components/sync-activities-button";
 import { saveActivities, cleanOldActivities, getActivitiesFromDB } from "@/lib/activities";
-import { getTestStravaCredentials } from "@/lib/strava-auth";
 
 async function getStravaActivities(accessToken: string) {
   try {
@@ -60,10 +59,13 @@ export default async function ActivitiesPage() {
     },
   });
 
-  // Usar credenciales de prueba si no hay configuración
-  const testCredentials = getTestStravaCredentials();
-  const clientId = stravaConfig?.clientId || testCredentials.clientId;
-  const clientSecret = stravaConfig?.clientSecret || testCredentials.clientSecret;
+  // Las credenciales deben estar en la base de datos
+  if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+    redirect("/dashboard?error=strava_credentials_missing");
+  }
+
+  const clientId = stravaConfig.clientId;
+  const clientSecret = stravaConfig.clientSecret;
 
   // Verificar si el token ha expirado y refrescarlo si es necesario
   let accessToken = stravaAccount.accessToken;

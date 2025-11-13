@@ -1,50 +1,23 @@
-// VALORES DE PRUEBA HARDCODEADOS (para testing)
-const TEST_CLIENT_ID = "185153";
-const TEST_CLIENT_SECRET = "25660a0409899bddc964ba7ffb1cf83544eaf1b2";
-
-/**
- * Obtiene las credenciales de prueba de Strava
- * Útil para testing cuando no hay variables de entorno configuradas
- */
-export function getTestStravaCredentials() {
-  const credentials = {
-    clientId: TEST_CLIENT_ID,
-    clientSecret: TEST_CLIENT_SECRET,
-  };
-
-  // Validar que las credenciales no estén vacías
-  if (!credentials.clientId || !credentials.clientSecret) {
-    console.error("ERROR: Credenciales de prueba incompletas!");
-    console.error("Client ID:", credentials.clientId || "MISSING");
-    console.error(
-      "Client Secret:",
-      credentials.clientSecret ? "EXISTS" : "MISSING"
-    );
-  }
-
-  return credentials;
-}
-
 /**
  * Genera la URL de autorización de Strava
  * Funciona tanto en servidor como en cliente
  * @param redirectUri - URL de redirección
- * @param clientId - Client ID de Strava (opcional, si no se proporciona usa variables de entorno)
+ * @param clientId - Client ID de Strava
  */
 export function getStravaAuthUrl(
   redirectUri: string,
-  clientId?: string
+  clientId: string
 ): string {
-  // Si se proporciona clientId, usarlo; si no, usar variables de entorno
+  // Obtener clientId: usar el proporcionado o las variables de entorno
 
-  const finalClientId =
-    clientId ||
-    (typeof window === "undefined"
-      ? process.env.STRAVA_CLIENT_ID || TEST_CLIENT_ID
-      : process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID || TEST_CLIENT_ID);
-
-  if (!finalClientId) {
-    throw new Error("Client ID de Strava no está configurado");
+  // Validar y normalizar redirectUri - debe tener protocolo completo
+  let normalizedRedirectUri = redirectUri.trim();
+  if (
+    !normalizedRedirectUri.startsWith("http://") &&
+    !normalizedRedirectUri.startsWith("https://")
+  ) {
+    // Si no tiene protocolo, agregar https://
+    normalizedRedirectUri = `https://${normalizedRedirectUri}`;
   }
 
   // Scope en el orden recomendado por Strava: activity:read primero, luego read
@@ -55,13 +28,17 @@ export function getStravaAuthUrl(
   // Nota: Strava puede redirigir automáticamente de /authorize a /accept_application
   const baseUrl = "https://www.strava.com/oauth/authorize";
   const params = new URLSearchParams({
-    client_id: finalClientId.toString(),
-    redirect_uri: redirectUri,
+    client_id: clientId.toString(),
+    redirect_uri: normalizedRedirectUri,
     response_type: responseType,
     scope: scope,
   });
 
-  console.log("params", `${baseUrl}?${params.toString()}`);
+  console.log("=== STRAVA AUTH URL GENERATION ===");
+  console.log("Redirect URI original:", redirectUri);
+  console.log("Redirect URI normalizado:", normalizedRedirectUri);
+  console.log("URL completa:", `${baseUrl}?${params.toString()}`);
+  console.log("==================================");
 
   return `${baseUrl}?${params.toString()}`;
 }

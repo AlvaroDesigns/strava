@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTestStravaCredentials } from "@/lib/strava-auth";
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
@@ -36,11 +35,18 @@ export async function GET(request: Request) {
       },
     });
 
-    // Usar credenciales de prueba si no hay configuración en la BD
-    const testCredentials = getTestStravaCredentials();
-    const clientId = stravaConfig?.clientId || testCredentials.clientId;
-    const clientSecret =
-      stravaConfig?.clientSecret || testCredentials.clientSecret;
+    // Las credenciales deben estar en la base de datos
+    if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
+      return NextResponse.redirect(
+        new URL(
+          "/dashboard?error=strava_credentials_missing",
+          request.url
+        )
+      );
+    }
+
+    const clientId = stravaConfig.clientId;
+    const clientSecret = stravaConfig.clientSecret;
 
     // DEBUG: Verificar que las credenciales se están pasando correctamente
     console.log("=== DEBUG STRAVA CALLBACK ===");
@@ -50,8 +56,7 @@ export async function GET(request: Request) {
     console.log("Client Secret length:", clientSecret?.length || 0);
     console.log("Code recibido:", code ? "Sí" : "No");
     console.log("Code value:", code || "N/A");
-    console.log("Usando credenciales de BD:", !!stravaConfig);
-    console.log("Usando credenciales de prueba:", !stravaConfig);
+    console.log("Usando credenciales de BD:", true);
     console.log("=============================");
 
     // Intercambiar código por token
