@@ -25,15 +25,25 @@ export async function GET(request: Request) {
     const clientId = stravaConfig?.clientId || testCredentials.clientId;
 
     // Obtener el dominio desde la request actual para construir la URL dinámicamente
-    // Si hay un dominio público configurado (para túnel), usarlo; si no, usar el de la request
-    const publicDomain = process.env.PUBLIC_DOMAIN; // Ej: https://random-name.loca.lt
+    // Prioridad: NEXTAUTH_URL > PUBLIC_DOMAIN > request URL
+    const nextAuthUrl = process.env.NEXTAUTH_URL; // URL base de la aplicación
+    const publicDomain = process.env.PUBLIC_DOMAIN; // Para túneles locales
     let redirectUri: string;
 
-    if (publicDomain) {
-      // Usar dominio público del túnel
-      redirectUri = `${publicDomain}/api/strava/callback`;
+    if (nextAuthUrl) {
+      // Usar NEXTAUTH_URL si está configurada (recomendado para producción)
+      const baseUrl = nextAuthUrl.endsWith("/")
+        ? nextAuthUrl.slice(0, -1)
+        : nextAuthUrl;
+      redirectUri = `${baseUrl}/api/strava/callback`;
+    } else if (publicDomain) {
+      // Usar dominio público del túnel (para desarrollo con túnel)
+      const domain = publicDomain.endsWith("/")
+        ? publicDomain.slice(0, -1)
+        : publicDomain;
+      redirectUri = `${domain}/api/strava/callback`;
     } else {
-      // Usar dominio de la request actual
+      // Usar dominio de la request actual (fallback)
       const url = new URL(request.url);
       const protocol = url.protocol; // http: o https:
       const host = url.host; // localhost:3000 o tu-dominio.com
@@ -51,9 +61,15 @@ export async function GET(request: Request) {
     console.log("=== DEBUG STRAVA AUTH ===");
     console.log("Client ID usado:", clientId);
     console.log("Redirect URI completo:", redirectUri);
+    console.log("NEXTAUTH_URL configurado:", nextAuthUrl || "No");
+    console.log("Public Domain configurado:", publicDomain || "No");
     console.log(
-      "Public Domain configurado:",
-      publicDomain || "No (usando request URL)"
+      "Origen de redirectUri:",
+      nextAuthUrl
+        ? "NEXTAUTH_URL"
+        : publicDomain
+        ? "PUBLIC_DOMAIN"
+        : "Request URL"
     );
     console.log("=========================");
 
