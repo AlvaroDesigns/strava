@@ -40,9 +40,15 @@ async function getActivitiesForUser(
     if (new Date() >= stravaAccount.expiresAt) {
       try {
         // Las credenciales deben estar en la base de datos
-        if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
-          console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
-          continue;
+        if (
+          !stravaConfig ||
+          !stravaConfig.clientId ||
+          !stravaConfig.clientSecret
+        ) {
+          console.error(
+            `Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`
+          );
+          return [];
         }
 
         const clientId = stravaConfig.clientId;
@@ -246,8 +252,8 @@ export async function GET(request: NextRequest) {
         moving_time: activity.movingTime,
         elapsed_time: activity.elapsedTime,
         total_elevation_gain: activity.totalElevationGain || 0,
-        average_speed: activity.averageSpeed || 0,
-        max_speed: activity.maxSpeed || 0,
+        average_speed: activity.averageSpeed ?? 0,
+        max_speed: activity.maxSpeed ?? null,
         average_watts: activity.averageWatts || null,
         max_watts: activity.maxWatts || null,
         start_date: activity.startDate.toISOString(),
@@ -278,8 +284,14 @@ export async function GET(request: NextRequest) {
           });
 
           // Las credenciales deben estar en la base de datos
-          if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
-            console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
+          if (
+            !stravaConfig ||
+            !stravaConfig.clientId ||
+            !stravaConfig.clientSecret
+          ) {
+            console.error(
+              `Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`
+            );
             continue;
           }
 
@@ -327,8 +339,14 @@ export async function GET(request: NextRequest) {
             });
 
             // Las credenciales deben estar en la base de datos
-            if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
-              console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
+            if (
+              !stravaConfig ||
+              !stravaConfig.clientId ||
+              !stravaConfig.clientSecret
+            ) {
+              console.error(
+                `Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`
+              );
               return;
             }
 
@@ -411,8 +429,13 @@ export async function GET(request: NextRequest) {
       averagePowerByDate: calculateAveragePowerByDate(filteredActivities),
       // Duración media
       averageDuration: calculateAverageDuration(filteredActivities),
-      // Velocidad máxima
-      maxSpeed: Math.max(...filteredActivities.map((a) => a.max_speed || 0), 0),
+      // Velocidad máxima - solo considerar valores numéricos válidos (no null)
+      maxSpeed: (() => {
+        const speeds = filteredActivities
+          .map((a) => a.max_speed)
+          .filter((s): s is number => s !== null && s !== undefined && s > 0);
+        return speeds.length > 0 ? Math.max(...speeds) : 0;
+      })(),
       // Velocidad media - usar TODAS las actividades
       averageSpeed: calculateAverageSpeed(allActivities),
       // Altura máxima

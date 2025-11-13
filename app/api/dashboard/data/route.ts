@@ -302,8 +302,8 @@ export async function GET(request: NextRequest) {
             moving_time: activity.movingTime || 0,
             elapsed_time: activity.elapsedTime || 0,
             total_elevation_gain: activity.totalElevationGain || 0,
-            average_speed: activity.averageSpeed || 0,
-            max_speed: activity.maxSpeed || 0,
+            average_speed: activity.averageSpeed ?? 0,
+            max_speed: activity.maxSpeed ?? null,
             average_watts: activity.averageWatts || null,
             max_watts: activity.maxWatts || null,
             start_date: startDate.toISOString(),
@@ -405,10 +405,12 @@ export async function GET(request: NextRequest) {
         activities: filteredActivities,
 
         // KPIs - Máximas
-        maxSpeed:
-          filteredActivities.length > 0
-            ? Math.max(...filteredActivities.map((a) => a?.max_speed || 0), 0)
-            : 0,
+        maxSpeed: (() => {
+          const speeds = filteredActivities
+            .map((a) => a?.max_speed)
+            .filter((s): s is number => s !== null && s !== undefined && s > 0);
+          return speeds.length > 0 ? Math.max(...speeds) : 0;
+        })(),
         maxElevation:
           filteredActivities.length > 0
             ? Math.max(
