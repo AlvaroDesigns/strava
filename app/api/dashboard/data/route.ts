@@ -42,7 +42,7 @@ async function getActivitiesForUser(
         // Las credenciales deben estar en la base de datos
         if (!stravaConfig || !stravaConfig.clientId || !stravaConfig.clientSecret) {
           console.error(`Credenciales de Strava no configuradas para usuario ${stravaAccount.userId}`);
-          continue;
+          return [];
         }
 
         const clientId = stravaConfig.clientId;
