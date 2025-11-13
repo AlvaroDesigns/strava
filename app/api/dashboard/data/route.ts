@@ -261,6 +261,11 @@ export async function GET(request: NextRequest) {
     // Obtener actividades desde la base de datos
     let dbActivities = await getAllActivitiesFromDB(startDate, endDate);
 
+    // Asegurar que dbActivities sea un array
+    if (!Array.isArray(dbActivities)) {
+      dbActivities = [];
+    }
+
     // Filtrar por usuario si se especifica
     if (userId) {
       dbActivities = dbActivities.filter(
@@ -269,31 +274,47 @@ export async function GET(request: NextRequest) {
     }
 
     // Convertir actividades de BD al formato esperado
-    let allActivities: any[] = dbActivities.map((activity) => {
-      const userName =
-        activity.stravaAccount?.firstName ||
-        activity.user?.name ||
-        activity.user?.email ||
-        "Usuario";
+    let allActivities: any[] = dbActivities
+      .filter((activity) => activity != null)
+      .map((activity) => {
+        try {
+          const userName =
+            activity.stravaAccount?.firstName ||
+            activity.user?.name ||
+            activity.user?.email ||
+            "Usuario";
 
-      return {
-        id: Number(activity.stravaActivityId),
-        name: activity.name,
-        type: activity.type || null,
-        distance: activity.distance || 0,
-        moving_time: activity.movingTime || 0,
-        elapsed_time: activity.elapsedTime || 0,
-        total_elevation_gain: activity.totalElevationGain || 0,
-        average_speed: activity.averageSpeed || 0,
-        max_speed: activity.maxSpeed || 0,
-        average_watts: activity.averageWatts || null,
-        max_watts: activity.maxWatts || null,
-        start_date: activity.startDate.toISOString(),
-        start_date_local: activity.startDateLocal.toISOString(),
-        userId: activity.userId,
-        userName,
-      };
-    });
+          // Validar que las fechas existan antes de convertirlas
+          const startDate = activity.startDate
+            ? new Date(activity.startDate)
+            : new Date();
+          const startDateLocal = activity.startDateLocal
+            ? new Date(activity.startDateLocal)
+            : startDate;
+
+          return {
+            id: Number(activity.stravaActivityId) || 0,
+            name: activity.name || "Actividad sin nombre",
+            type: activity.type || null,
+            distance: activity.distance || 0,
+            moving_time: activity.movingTime || 0,
+            elapsed_time: activity.elapsedTime || 0,
+            total_elevation_gain: activity.totalElevationGain || 0,
+            average_speed: activity.averageSpeed || 0,
+            max_speed: activity.maxSpeed || 0,
+            average_watts: activity.averageWatts || null,
+            max_watts: activity.maxWatts || null,
+            start_date: startDate.toISOString(),
+            start_date_local: startDateLocal.toISOString(),
+            userId: activity.userId || "unknown",
+            userName,
+          };
+        } catch (error) {
+          console.error("Error al convertir actividad:", error);
+          return null;
+        }
+      })
+      .filter((activity) => activity != null);
 
     // Sincronizar desde la API de Strava si no hay actividades en BD
     if (accountsToProcess.length > 0 && allActivities.length === 0) {
@@ -343,72 +364,104 @@ export async function GET(request: NextRequest) {
       console.error("Error al limpiar actividades antiguas:", error);
     });
 
+    // Asegurar que allActivities sea un array
+    if (!Array.isArray(allActivities)) {
+      allActivities = [];
+    }
+
     // Obtener tipos de actividades disponibles
     const availableTypes = Array.from(
-      new Set(allActivities.map((a) => a.type).filter((t) => t))
+      new Set(
+        allActivities
+          .map((a) => (a && a.type ? a.type : null))
+          .filter((t) => t != null)
+      )
     );
 
     // Filtrar actividades por tipo
     const filteredActivities = allActivities.filter(
-      (activity) => activity.type === activityType
+      (activity) => activity && activity.type === activityType
     );
 
-    // Calcular todas las estadísticas del dashboard
-    const dashboardData = {
-      // Metadatos
-      dateRange: {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      },
-      filters: {
-        userId: userId || null,
-        activityType,
-      },
-      totalActivities: filteredActivities.length,
-      totalActivitiesAllTypes: allActivities.length,
-      availableActivityTypes: availableTypes,
+    // Calcular todas las estadísticas del dashboard con manejo de errores
+    try {
+      const dashboardData = {
+        // Metadatos
+        dateRange: {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
+        filters: {
+          userId: userId || null,
+          activityType,
+        },
+        totalActivities: filteredActivities.length,
+        totalActivitiesAllTypes: allActivities.length,
+        availableActivityTypes: availableTypes,
 
-      // Actividades
-      activities: filteredActivities,
+        // Actividades
+        activities: filteredActivities,
 
-      // KPIs - Máximas
-      maxSpeed:
-        filteredActivities.length > 0
-          ? Math.max(...filteredActivities.map((a) => a.max_speed || 0), 0)
-          : 0,
-      maxElevation:
-        filteredActivities.length > 0
-          ? Math.max(
-              ...filteredActivities.map((a) => a.total_elevation_gain || 0),
-              0
-            )
-          : 0,
-      maxPower: calculateMaxPower(allActivities),
-      maxDuration: calculateMaxDuration(allActivities),
+        // KPIs - Máximas
+        maxSpeed:
+          filteredActivities.length > 0
+            ? Math.max(...filteredActivities.map((a) => a?.max_speed || 0), 0)
+            : 0,
+        maxElevation:
+          filteredActivities.length > 0
+            ? Math.max(
+                ...filteredActivities.map((a) => a?.total_elevation_gain || 0),
+                0
+              )
+            : 0,
+        maxPower: calculateMaxPower(allActivities),
+        maxDuration: calculateMaxDuration(allActivities),
 
-      // KPIs - Medias
-      averageSpeed: calculateAverageSpeed(allActivities),
-      averageElevation: calculateAverageElevation(allActivities),
-      averagePower: calculateAveragePower(filteredActivities),
-      averageDuration: calculateAverageDuration(filteredActivities),
+        // KPIs - Medias
+        averageSpeed: calculateAverageSpeed(allActivities),
+        averageElevation: calculateAverageElevation(allActivities),
+        averagePower: calculateAveragePower(filteredActivities),
+        averageDuration: calculateAverageDuration(filteredActivities),
 
-      // Estadísticas por usuario
-      kilometersByUser: calculateKilometersByUser(filteredActivities),
-      kilometersByUserAndDate:
-        calculateKilometersByUserAndDate(filteredActivities),
-      averageSpeedByUser: calculateAverageSpeedByUser(filteredActivities),
-      averageSpeedByUserAndDate:
-        calculateAverageSpeedByUserAndDate(filteredActivities),
-      averageElevationByUser:
-        calculateAverageElevationByUser(filteredActivities),
-      averageElevationByUserAndDate:
-        calculateAverageElevationByUserAndDate(filteredActivities),
+        // Estadísticas por usuario
+        kilometersByUser: calculateKilometersByUser(filteredActivities),
+        kilometersByUserAndDate:
+          calculateKilometersByUserAndDate(filteredActivities),
+        averageSpeedByUser: calculateAverageSpeedByUser(filteredActivities),
+        averageSpeedByUserAndDate:
+          calculateAverageSpeedByUserAndDate(filteredActivities),
+        averageElevationByUser:
+          calculateAverageElevationByUser(filteredActivities),
+        averageElevationByUserAndDate:
+          calculateAverageElevationByUserAndDate(filteredActivities),
 
-      // Estadísticas por fecha
-      averagePowerByDate: calculateAveragePowerByDate(filteredActivities),
-    };
+        // Estadísticas por fecha
+        averagePowerByDate: calculateAveragePowerByDate(filteredActivities),
+      };
 
-    return NextResponse.json(dashboardData);
+      return NextResponse.json(dashboardData);
+    } catch (calcError) {
+      console.error("Error al calcular estadísticas:", calcError);
+      // Devolver respuesta básica en caso de error en cálculos
+      return NextResponse.json(
+        {
+          dateRange: {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          },
+          filters: {
+            userId: userId || null,
+            activityType,
+          },
+          totalActivities: filteredActivities.length,
+          totalActivitiesAllTypes: allActivities.length,
+          availableActivityTypes: availableTypes,
+          activities: filteredActivities,
+          error: "Error al calcular algunas estadísticas",
+        },
+        { status: 200 } // Devolver 200 pero con datos parciales
+      );
+    }
   } catch (error) {
     console.error("Error al obtener datos del dashboard:", error);
     const errorMessage =
@@ -422,163 +475,195 @@ export async function GET(request: NextRequest) {
 
 // Funciones de cálculo (reutilizadas del endpoint de stats)
 function calculateKilometersByUser(activities: any[]) {
-  if (!activities || activities.length === 0) {
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return [];
+    }
+
+    const userMap = new Map<string, { name: string; kilometers: number }>();
+
+    activities.forEach((activity) => {
+      if (!activity) return;
+      const userId = activity.userId || "unknown";
+      const userName = activity.userName || "Usuario";
+      const kilometers = (activity.distance || 0) / 1000;
+
+      if (userMap.has(userId)) {
+        const existing = userMap.get(userId)!;
+        existing.kilometers += kilometers;
+      } else {
+        userMap.set(userId, { name: userName, kilometers });
+      }
+    });
+
+    return Array.from(userMap.values()).sort(
+      (a, b) => b.kilometers - a.kilometers
+    );
+  } catch (error) {
+    console.error("Error en calculateKilometersByUser:", error);
     return [];
   }
-
-  const userMap = new Map<string, { name: string; kilometers: number }>();
-
-  activities.forEach((activity) => {
-    const userId = activity.userId || "unknown";
-    const userName = activity.userName || "Usuario";
-    const kilometers = (activity.distance || 0) / 1000;
-
-    if (userMap.has(userId)) {
-      const existing = userMap.get(userId)!;
-      existing.kilometers += kilometers;
-    } else {
-      userMap.set(userId, { name: userName, kilometers });
-    }
-  });
-
-  return Array.from(userMap.values()).sort(
-    (a, b) => b.kilometers - a.kilometers
-  );
 }
 
 function calculateKilometersByUserAndDate(activities: any[]) {
-  if (!activities || activities.length === 0) {
-    return { data: [], users: [] };
-  }
-
-  const usersMap = new Map<string, string>();
-  activities.forEach((activity) => {
-    const userId = activity.userId || "unknown";
-    const userName = activity.userName || "Usuario";
-    if (!usersMap.has(userId)) {
-      usersMap.set(userId, userName);
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return { data: [], users: [] };
     }
-  });
 
-  const dateMap = new Map<string, Map<string, number>>();
-
-  activities.forEach((activity) => {
-    try {
-      const date = new Date(activity.start_date_local || activity.start_date);
-      if (isNaN(date.getTime())) return;
-
-      const dateKey = date.toISOString().split("T")[0];
+    const usersMap = new Map<string, string>();
+    activities.forEach((activity) => {
+      if (!activity) return;
       const userId = activity.userId || "unknown";
-      const kilometers = (activity.distance || 0) / 1000;
-
-      if (!dateMap.has(dateKey)) {
-        dateMap.set(dateKey, new Map<string, number>());
+      const userName = activity.userName || "Usuario";
+      if (!usersMap.has(userId)) {
+        usersMap.set(userId, userName);
       }
-
-      const userDateMap = dateMap.get(dateKey)!;
-      if (userDateMap.has(userId)) {
-        userDateMap.set(userId, userDateMap.get(userId)! + kilometers);
-      } else {
-        userDateMap.set(userId, kilometers);
-      }
-    } catch (error) {
-      console.error("Error al procesar fecha de actividad:", error);
-    }
-  });
-
-  const allDates = Array.from(dateMap.keys()).sort();
-  const allUserIds = Array.from(usersMap.keys());
-
-  const result = allDates.map((date) => {
-    const dateData: any = { date };
-    const userDateMap = dateMap.get(date) || new Map();
-
-    allUserIds.forEach((userId) => {
-      const userName = usersMap.get(userId) || "Usuario";
-      const key = userName.replace(/\s+/g, "_").toLowerCase();
-      dateData[key] = userDateMap.get(userId) || 0;
     });
 
-    return dateData;
-  });
+    const dateMap = new Map<string, Map<string, number>>();
 
-  return {
-    data: result,
-    users: Array.from(usersMap.entries()).map(([userId, userName]) => ({
-      id: userId,
-      name: userName,
-      key: userName.replace(/\s+/g, "_").toLowerCase(),
-    })),
-  };
+    activities.forEach((activity) => {
+      if (!activity) return;
+      try {
+        const dateStr = activity.start_date_local || activity.start_date;
+        if (!dateStr) return;
+
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return;
+
+        const dateKey = date.toISOString().split("T")[0];
+        const userId = activity.userId || "unknown";
+        const kilometers = (activity.distance || 0) / 1000;
+
+        if (!dateMap.has(dateKey)) {
+          dateMap.set(dateKey, new Map<string, number>());
+        }
+
+        const userDateMap = dateMap.get(dateKey)!;
+        if (userDateMap.has(userId)) {
+          userDateMap.set(userId, userDateMap.get(userId)! + kilometers);
+        } else {
+          userDateMap.set(userId, kilometers);
+        }
+      } catch (error) {
+        console.error("Error al procesar fecha de actividad:", error);
+      }
+    });
+
+    const allDates = Array.from(dateMap.keys()).sort();
+    const allUserIds = Array.from(usersMap.keys());
+
+    const result = allDates.map((date) => {
+      const dateData: any = { date };
+      const userDateMap = dateMap.get(date) || new Map();
+
+      allUserIds.forEach((userId) => {
+        const userName = usersMap.get(userId) || "Usuario";
+        const key = userName.replace(/\s+/g, "_").toLowerCase();
+        dateData[key] = userDateMap.get(userId) || 0;
+      });
+
+      return dateData;
+    });
+
+    return {
+      data: result,
+      users: Array.from(usersMap.entries()).map(([userId, userName]) => ({
+        id: userId,
+        name: userName,
+        key: userName.replace(/\s+/g, "_").toLowerCase(),
+      })),
+    };
+  } catch (error) {
+    console.error("Error en calculateKilometersByUserAndDate:", error);
+    return { data: [], users: [] };
+  }
 }
 
 function calculateAverageSpeedByUser(activities: any[]) {
-  if (!activities || activities.length === 0) {
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return [];
+    }
+
+    const userMap = new Map<
+      string,
+      { name: string; totalSpeed: number; count: number }
+    >();
+
+    activities.forEach((activity) => {
+      if (!activity) return;
+      if (activity.average_speed) {
+        const userId = activity.userId || "unknown";
+        const userName = activity.userName || "Usuario";
+        const speedKmh = (activity.average_speed || 0) * 3.6;
+
+        if (userMap.has(userId)) {
+          const existing = userMap.get(userId)!;
+          existing.totalSpeed += speedKmh;
+          existing.count += 1;
+        } else {
+          userMap.set(userId, {
+            name: userName,
+            totalSpeed: speedKmh,
+            count: 1,
+          });
+        }
+      }
+    });
+
+    return Array.from(userMap.entries()).map(([userId, data]) => ({
+      userId,
+      name: data.name,
+      averageSpeed: data.count > 0 ? data.totalSpeed / data.count : 0,
+    }));
+  } catch (error) {
+    console.error("Error en calculateAverageSpeedByUser:", error);
     return [];
   }
-
-  const userMap = new Map<
-    string,
-    { name: string; totalSpeed: number; count: number }
-  >();
-
-  activities.forEach((activity) => {
-    if (activity.average_speed) {
-      const userId = activity.userId || "unknown";
-      const userName = activity.userName || "Usuario";
-      const speedKmh = (activity.average_speed || 0) * 3.6;
-
-      if (userMap.has(userId)) {
-        const existing = userMap.get(userId)!;
-        existing.totalSpeed += speedKmh;
-        existing.count += 1;
-      } else {
-        userMap.set(userId, { name: userName, totalSpeed: speedKmh, count: 1 });
-      }
-    }
-  });
-
-  return Array.from(userMap.entries()).map(([userId, data]) => ({
-    userId,
-    name: data.name,
-    averageSpeed: data.count > 0 ? data.totalSpeed / data.count : 0,
-  }));
 }
 
 function calculateAverageElevationByUser(activities: any[]) {
-  if (!activities || activities.length === 0) {
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return [];
+    }
+
+    const userMap = new Map<
+      string,
+      { name: string; totalElevation: number; count: number }
+    >();
+
+    activities.forEach((activity) => {
+      if (!activity) return;
+      if (activity.total_elevation_gain) {
+        const userId = activity.userId || "unknown";
+        const userName = activity.userName || "Usuario";
+
+        if (userMap.has(userId)) {
+          const existing = userMap.get(userId)!;
+          existing.totalElevation += activity.total_elevation_gain || 0;
+          existing.count += 1;
+        } else {
+          userMap.set(userId, {
+            name: userName,
+            totalElevation: activity.total_elevation_gain || 0,
+            count: 1,
+          });
+        }
+      }
+    });
+
+    return Array.from(userMap.entries()).map(([userId, data]) => ({
+      userId,
+      name: data.name,
+      averageElevation: data.count > 0 ? data.totalElevation / data.count : 0,
+    }));
+  } catch (error) {
+    console.error("Error en calculateAverageElevationByUser:", error);
     return [];
   }
-
-  const userMap = new Map<
-    string,
-    { name: string; totalElevation: number; count: number }
-  >();
-
-  activities.forEach((activity) => {
-    if (activity.total_elevation_gain) {
-      const userId = activity.userId || "unknown";
-      const userName = activity.userName || "Usuario";
-
-      if (userMap.has(userId)) {
-        const existing = userMap.get(userId)!;
-        existing.totalElevation += activity.total_elevation_gain || 0;
-        existing.count += 1;
-      } else {
-        userMap.set(userId, {
-          name: userName,
-          totalElevation: activity.total_elevation_gain || 0,
-          count: 1,
-        });
-      }
-    }
-  });
-
-  return Array.from(userMap.entries()).map(([userId, data]) => ({
-    userId,
-    name: data.name,
-    averageElevation: data.count > 0 ? data.totalElevation / data.count : 0,
-  }));
 }
 
 function calculateAveragePower(activities: any[]) {
@@ -668,201 +753,230 @@ function calculateAverageElevation(activities: any[]) {
 }
 
 function calculateAverageSpeedByUserAndDate(activities: any[]) {
-  if (!activities || activities.length === 0) {
-    return { data: [], users: [] };
-  }
-
-  const usersMap = new Map<string, string>();
-  activities.forEach((activity) => {
-    const userId = activity.userId || "unknown";
-    const userName = activity.userName || "Usuario";
-    if (!usersMap.has(userId)) {
-      usersMap.set(userId, userName);
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return { data: [], users: [] };
     }
-  });
 
-  const dateMap = new Map<
-    string,
-    Map<string, { totalSpeed: number; count: number }>
-  >();
-
-  activities.forEach((activity) => {
-    if (activity.average_speed) {
-      try {
-        const date = new Date(activity.start_date_local || activity.start_date);
-        if (isNaN(date.getTime())) return;
-
-        const dateKey = date.toISOString().split("T")[0];
-        const userId = activity.userId || "unknown";
-        const speedKmh = (activity.average_speed || 0) * 3.6;
-
-        if (!dateMap.has(dateKey)) {
-          dateMap.set(dateKey, new Map());
-        }
-
-        const userDateMap = dateMap.get(dateKey)!;
-        if (userDateMap.has(userId)) {
-          const existing = userDateMap.get(userId)!;
-          existing.totalSpeed += speedKmh;
-          existing.count += 1;
-        } else {
-          userDateMap.set(userId, { totalSpeed: speedKmh, count: 1 });
-        }
-      } catch (error) {
-        console.error("Error al procesar fecha de actividad:", error);
+    const usersMap = new Map<string, string>();
+    activities.forEach((activity) => {
+      if (!activity) return;
+      const userId = activity.userId || "unknown";
+      const userName = activity.userName || "Usuario";
+      if (!usersMap.has(userId)) {
+        usersMap.set(userId, userName);
       }
-    }
-  });
-
-  const allDates = Array.from(dateMap.keys()).sort();
-  const allUserIds = Array.from(usersMap.keys());
-
-  const result = allDates.map((date) => {
-    const dateData: any = { date };
-    const userDateMap = dateMap.get(date) || new Map();
-
-    allUserIds.forEach((userId) => {
-      const userName = usersMap.get(userId) || "Usuario";
-      const key = userName.replace(/\s+/g, "_").toLowerCase();
-      const userData = userDateMap.get(userId);
-      dateData[key] =
-        userData && userData.count > 0
-          ? userData.totalSpeed / userData.count
-          : 0;
     });
 
-    return dateData;
-  });
+    const dateMap = new Map<
+      string,
+      Map<string, { totalSpeed: number; count: number }>
+    >();
 
-  return {
-    data: result,
-    users: Array.from(usersMap.entries()).map(([userId, userName]) => ({
-      id: userId,
-      name: userName,
-      key: userName.replace(/\s+/g, "_").toLowerCase(),
-    })),
-  };
+    activities.forEach((activity) => {
+      if (!activity) return;
+      if (activity.average_speed) {
+        try {
+          const dateStr = activity.start_date_local || activity.start_date;
+          if (!dateStr) return;
+
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return;
+
+          const dateKey = date.toISOString().split("T")[0];
+          const userId = activity.userId || "unknown";
+          const speedKmh = (activity.average_speed || 0) * 3.6;
+
+          if (!dateMap.has(dateKey)) {
+            dateMap.set(dateKey, new Map());
+          }
+
+          const userDateMap = dateMap.get(dateKey)!;
+          if (userDateMap.has(userId)) {
+            const existing = userDateMap.get(userId)!;
+            existing.totalSpeed += speedKmh;
+            existing.count += 1;
+          } else {
+            userDateMap.set(userId, { totalSpeed: speedKmh, count: 1 });
+          }
+        } catch (error) {
+          console.error("Error al procesar fecha de actividad:", error);
+        }
+      }
+    });
+
+    const allDates = Array.from(dateMap.keys()).sort();
+    const allUserIds = Array.from(usersMap.keys());
+
+    const result = allDates.map((date) => {
+      const dateData: any = { date };
+      const userDateMap = dateMap.get(date) || new Map();
+
+      allUserIds.forEach((userId) => {
+        const userName = usersMap.get(userId) || "Usuario";
+        const key = userName.replace(/\s+/g, "_").toLowerCase();
+        const userData = userDateMap.get(userId);
+        dateData[key] =
+          userData && userData.count > 0
+            ? userData.totalSpeed / userData.count
+            : 0;
+      });
+
+      return dateData;
+    });
+
+    return {
+      data: result,
+      users: Array.from(usersMap.entries()).map(([userId, userName]) => ({
+        id: userId,
+        name: userName,
+        key: userName.replace(/\s+/g, "_").toLowerCase(),
+      })),
+    };
+  } catch (error) {
+    console.error("Error en calculateAverageSpeedByUserAndDate:", error);
+    return { data: [], users: [] };
+  }
 }
 
 function calculateAverageElevationByUserAndDate(activities: any[]) {
-  if (!activities || activities.length === 0) {
-    return { data: [], users: [] };
-  }
-
-  const usersMap = new Map<string, string>();
-  activities.forEach((activity) => {
-    const userId = activity.userId || "unknown";
-    const userName = activity.userName || "Usuario";
-    if (!usersMap.has(userId)) {
-      usersMap.set(userId, userName);
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return { data: [], users: [] };
     }
-  });
 
-  const dateMap = new Map<
-    string,
-    Map<string, { totalElevation: number; count: number }>
-  >();
-
-  activities.forEach((activity) => {
-    if (activity.total_elevation_gain) {
-      try {
-        const date = new Date(activity.start_date_local || activity.start_date);
-        if (isNaN(date.getTime())) return;
-
-        const dateKey = date.toISOString().split("T")[0];
-        const userId = activity.userId || "unknown";
-
-        if (!dateMap.has(dateKey)) {
-          dateMap.set(dateKey, new Map());
-        }
-
-        const userDateMap = dateMap.get(dateKey)!;
-        if (userDateMap.has(userId)) {
-          const existing = userDateMap.get(userId)!;
-          existing.totalElevation += activity.total_elevation_gain || 0;
-          existing.count += 1;
-        } else {
-          userDateMap.set(userId, {
-            totalElevation: activity.total_elevation_gain || 0,
-            count: 1,
-          });
-        }
-      } catch (error) {
-        console.error("Error al procesar fecha de actividad:", error);
+    const usersMap = new Map<string, string>();
+    activities.forEach((activity) => {
+      if (!activity) return;
+      const userId = activity.userId || "unknown";
+      const userName = activity.userName || "Usuario";
+      if (!usersMap.has(userId)) {
+        usersMap.set(userId, userName);
       }
-    }
-  });
-
-  const allDates = Array.from(dateMap.keys()).sort();
-  const allUserIds = Array.from(usersMap.keys());
-
-  const result = allDates.map((date) => {
-    const dateData: any = { date };
-    const userDateMap = dateMap.get(date) || new Map();
-
-    allUserIds.forEach((userId) => {
-      const userName = usersMap.get(userId) || "Usuario";
-      const key = userName.replace(/\s+/g, "_").toLowerCase();
-      const userData = userDateMap.get(userId);
-      dateData[key] =
-        userData && userData.count > 0
-          ? userData.totalElevation / userData.count
-          : 0;
     });
 
-    return dateData;
-  });
+    const dateMap = new Map<
+      string,
+      Map<string, { totalElevation: number; count: number }>
+    >();
 
-  return {
-    data: result,
-    users: Array.from(usersMap.entries()).map(([userId, userName]) => ({
-      id: userId,
-      name: userName,
-      key: userName.replace(/\s+/g, "_").toLowerCase(),
-    })),
-  };
+    activities.forEach((activity) => {
+      if (!activity) return;
+      if (activity.total_elevation_gain) {
+        try {
+          const dateStr = activity.start_date_local || activity.start_date;
+          if (!dateStr) return;
+
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return;
+
+          const dateKey = date.toISOString().split("T")[0];
+          const userId = activity.userId || "unknown";
+
+          if (!dateMap.has(dateKey)) {
+            dateMap.set(dateKey, new Map());
+          }
+
+          const userDateMap = dateMap.get(dateKey)!;
+          if (userDateMap.has(userId)) {
+            const existing = userDateMap.get(userId)!;
+            existing.totalElevation += activity.total_elevation_gain || 0;
+            existing.count += 1;
+          } else {
+            userDateMap.set(userId, {
+              totalElevation: activity.total_elevation_gain || 0,
+              count: 1,
+            });
+          }
+        } catch (error) {
+          console.error("Error al procesar fecha de actividad:", error);
+        }
+      }
+    });
+
+    const allDates = Array.from(dateMap.keys()).sort();
+    const allUserIds = Array.from(usersMap.keys());
+
+    const result = allDates.map((date) => {
+      const dateData: any = { date };
+      const userDateMap = dateMap.get(date) || new Map();
+
+      allUserIds.forEach((userId) => {
+        const userName = usersMap.get(userId) || "Usuario";
+        const key = userName.replace(/\s+/g, "_").toLowerCase();
+        const userData = userDateMap.get(userId);
+        dateData[key] =
+          userData && userData.count > 0
+            ? userData.totalElevation / userData.count
+            : 0;
+      });
+
+      return dateData;
+    });
+
+    return {
+      data: result,
+      users: Array.from(usersMap.entries()).map(([userId, userName]) => ({
+        id: userId,
+        name: userName,
+        key: userName.replace(/\s+/g, "_").toLowerCase(),
+      })),
+    };
+  } catch (error) {
+    console.error("Error en calculateAverageElevationByUserAndDate:", error);
+    return { data: [], users: [] };
+  }
 }
 
 function calculateAveragePowerByDate(activities: any[]) {
-  if (!activities || activities.length === 0) {
+  try {
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return [];
+    }
+
+    const dateMap = new Map<string, { totalPower: number; count: number }>();
+
+    activities.forEach((activity) => {
+      if (!activity) return;
+      if (activity.average_watts) {
+        try {
+          const dateStr = activity.start_date_local || activity.start_date;
+          if (!dateStr) return;
+
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return;
+
+          const dateKey = date.toISOString().split("T")[0];
+
+          if (dateMap.has(dateKey)) {
+            const existing = dateMap.get(dateKey)!;
+            existing.totalPower += activity.average_watts || 0;
+            existing.count += 1;
+          } else {
+            dateMap.set(dateKey, {
+              totalPower: activity.average_watts || 0,
+              count: 1,
+            });
+          }
+        } catch (error) {
+          console.error("Error al procesar fecha de actividad:", error);
+        }
+      }
+    });
+
+    const allDates = Array.from(dateMap.keys()).sort();
+
+    const result = allDates.map((date) => {
+      const dateData = dateMap.get(date)!;
+      return {
+        date,
+        power: dateData.count > 0 ? dateData.totalPower / dateData.count : 0,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error en calculateAveragePowerByDate:", error);
     return [];
   }
-
-  const dateMap = new Map<string, { totalPower: number; count: number }>();
-
-  activities.forEach((activity) => {
-    if (activity.average_watts) {
-      try {
-        const date = new Date(activity.start_date_local || activity.start_date);
-        if (isNaN(date.getTime())) return;
-
-        const dateKey = date.toISOString().split("T")[0];
-
-        if (dateMap.has(dateKey)) {
-          const existing = dateMap.get(dateKey)!;
-          existing.totalPower += activity.average_watts || 0;
-          existing.count += 1;
-        } else {
-          dateMap.set(dateKey, {
-            totalPower: activity.average_watts || 0,
-            count: 1,
-          });
-        }
-      } catch (error) {
-        console.error("Error al procesar fecha de actividad:", error);
-      }
-    }
-  });
-
-  const allDates = Array.from(dateMap.keys()).sort();
-
-  const result = allDates.map((date) => {
-    const dateData = dateMap.get(date)!;
-    return {
-      date,
-      power: dateData.count > 0 ? dateData.totalPower / dateData.count : 0,
-    };
-  });
-
-  return result;
 }
