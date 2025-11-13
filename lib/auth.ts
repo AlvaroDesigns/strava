@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { NextAuthOptions } from "next-auth";
+import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 // Validar variables de entorno necesarias para NextAuth
@@ -56,7 +56,7 @@ try {
   }
 }
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
@@ -70,10 +70,13 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const email = credentials.email as string;
+        const password = credentials.password as string;
+
         try {
           const user = await prisma.user.findUnique({
             where: {
-              email: credentials.email,
+              email: email,
             },
           });
 
@@ -81,10 +84,7 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password,
-            user.password
-          );
+          const isPasswordValid = await bcrypt.compare(password, user.password);
 
           if (!isPasswordValid) {
             return null;
@@ -121,16 +121,16 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error",
   },
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user: any }) {
       if (user) {
         token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (session.user) {
         session.user.id = token.id as string;
       }
@@ -138,3 +138,12 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
+
+// Crear instancia única de NextAuth para NextAuth v5
+const nextAuthInstance = NextAuth(authOptions);
+
+// Exportar auth() para usar en componentes del servidor
+export const { auth } = nextAuthInstance;
+
+// Exportar handlers para la ruta API
+export const { handlers } = nextAuthInstance;

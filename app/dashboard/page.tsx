@@ -13,15 +13,14 @@ import {
   getActivitiesFromDB,
   saveActivities,
 } from "@/lib/activities";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTestStravaCredentials } from "@/lib/strava-auth";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
 
   if (!session) {
     redirect("/login");

@@ -3,10 +3,9 @@ import {
   getAllActivitiesFromDB,
   saveActivities,
 } from "@/lib/activities";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTestStravaCredentials } from "@/lib/strava-auth";
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -166,7 +165,7 @@ async function getActivitiesForUser(
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
 
     if (!session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
