@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getStravaAuthUrl, getTestStravaCredentials } from "@/lib/strava-auth";
 import { NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     // Si hay un dominio público configurado (para túnel), usarlo; si no, usar el de la request
     const publicDomain = process.env.PUBLIC_DOMAIN; // Ej: https://random-name.loca.lt
     let redirectUri: string;
-    
+
     if (publicDomain) {
       // Usar dominio público del túnel
       redirectUri = `${publicDomain}/api/strava/callback`;
@@ -40,10 +40,21 @@ export async function GET(request: Request) {
       redirectUri = `${protocol}//${host}/api/strava/callback`;
     }
 
+    // Asegurar que el redirectUri use HTTPS en producción
+    if (
+      process.env.NODE_ENV === "production" &&
+      redirectUri.startsWith("http://")
+    ) {
+      redirectUri = redirectUri.replace("http://", "https://");
+    }
+
     console.log("=== DEBUG STRAVA AUTH ===");
     console.log("Client ID usado:", clientId);
     console.log("Redirect URI completo:", redirectUri);
-    console.log("Public Domain configurado:", publicDomain || "No (usando request URL)");
+    console.log(
+      "Public Domain configurado:",
+      publicDomain || "No (usando request URL)"
+    );
     console.log("=========================");
 
     const stravaAuthUrl = getStravaAuthUrl(redirectUri, clientId);
