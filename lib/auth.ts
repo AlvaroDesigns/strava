@@ -1,7 +1,7 @@
-import { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,30 +16,49 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email,
-          },
-        });
+        try {
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email,
+            },
+          });
 
-        if (!user) {
+          if (!user) {
+            return null;
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isPasswordValid) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          };
+        } catch (error: any) {
+          // Si el error es sobre DATABASE_URL, lanzar un error más claro
+          if (
+            error?.message?.includes("DATABASE_URL") ||
+            error?.message?.includes("postgresql://") ||
+            error?.message?.includes("postgres://")
+          ) {
+            console.error(
+              "❌ Error de conexión a la base de datos:",
+              error.message
+            );
+            throw new Error(
+              "Error de configuración de base de datos. Por favor, verifica que DATABASE_URL esté configurada correctamente en Vercel."
+            );
+          }
+          console.error("Error en authorize:", error);
           return null;
         }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
       },
     }),
   ],
@@ -64,4 +83,3 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
-
