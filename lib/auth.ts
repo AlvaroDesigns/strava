@@ -3,7 +3,61 @@ import bcrypt from "bcryptjs";
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+// Validar variables de entorno necesarias para NextAuth
+// Esta validación solo se ejecuta en runtime, no durante el build
+function validateNextAuthEnv() {
+  // No validar durante el build de Next.js
+  if (
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.NODE_ENV === "test"
+  ) {
+    return;
+  }
+
+  // Solo validar en el servidor (no en el cliente)
+  if (typeof window !== "undefined") {
+    return;
+  }
+
+  const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+  const nextAuthUrl = process.env.NEXTAUTH_URL;
+
+  if (!nextAuthSecret) {
+    const errorMessage =
+      "❌ NEXTAUTH_SECRET no está configurada. Por favor, configura esta variable de entorno en Vercel:\n" +
+      "1. Ve a tu proyecto en Vercel → Settings → Environment Variables\n" +
+      "2. Agrega NEXTAUTH_SECRET\n" +
+      "3. Genera un valor seguro con: openssl rand -base64 32";
+
+    console.error(errorMessage);
+    // En producción, lanzar el error para que NextAuth lo capture
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(errorMessage);
+    }
+  }
+
+  if (!nextAuthUrl && process.env.NODE_ENV === "production") {
+    console.warn(
+      "⚠️ NEXTAUTH_URL no está configurada. NextAuth intentará inferirla automáticamente, pero es recomendable configurarla explícitamente."
+    );
+  }
+}
+
+// Validar solo cuando se importa el módulo en el servidor
+// Usar un try-catch para evitar que falle el build
+try {
+  if (typeof window === "undefined") {
+    validateNextAuthEnv();
+  }
+} catch (error) {
+  // En desarrollo, mostrar el error pero no bloquear
+  if (process.env.NODE_ENV === "development") {
+    console.error("Error validando variables de NextAuth:", error);
+  }
+}
+
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -64,6 +118,7 @@ export const authOptions: NextAuthOptions = {
   ],
   pages: {
     signIn: "/login",
+    error: "/auth/error",
   },
   session: {
     strategy: "jwt",
